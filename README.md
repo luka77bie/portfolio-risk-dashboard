@@ -35,3 +35,17 @@ Historical VaR is estimated from the empirical distribution of portfolio returns
 ### Example
 tickers = ["AAPL", "MSFT", "NVDA", "JPM"]
 weights = [0.25, 0.25, 0.25, 0.25]
+
+## Example Outputs
+
+### Equity Curve
+
+![Equity Curve](outputs/equity_curve.png)
+
+### Drawdown
+
+![Drawdown](outputs/drawdown.png)
+
+### Correlation Matrix
+
+![Correlation Matrix](outputs/correlation_matrix.png)
