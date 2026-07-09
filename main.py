@@ -41,3 +41,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+print(f"Start Date: {prices.index.min().date()}")
+print(f"End Date: {prices.index.max().date()}")
+print(f"Number of Observations: {len(prices)}")
