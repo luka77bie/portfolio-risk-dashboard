@@ -53,3 +53,13 @@ weights = [0.5, 0.5]
 ### Correlation Matrix
 
 ![Correlation Matrix](outputs/correlation_matrix.png)
+
+## Data Pipeline
+
+This project uses a multi-source data ingestion pipeline:
+
+1. `yfinance` is used as the primary online data source.
+2. Stooq CSV data is used as a secondary online data source.
+3. If both online sources fail, the program falls back to `data/sample_prices.csv`.
+
+This design improves reproducibility and prevents the project from failing completely when a free external data provider is rate-limited or unavailable.
