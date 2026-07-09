@@ -38,6 +38,7 @@ Historical VaR is estimated from the empirical distribution of portfolio returns
 ```python
 tickers = ["AAPL", "MSFT"]
 weights = [0.5, 0.5]
+```
 
 ## Example Outputs
 
