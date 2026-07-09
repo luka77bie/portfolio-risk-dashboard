@@ -1,65 +1,209 @@
 # Portfolio Risk Dashboard
 
-A Python-based portfolio risk analytics tool for evaluating historical performance, downside risk, drawdown, and asset correlation of a multi-asset portfolio.
+A lightweight Python-based portfolio risk dashboard that downloads historical market data, calculates basic portfolio risk metrics, and visualises cumulative portfolio performance.
 
-## Motivation
+This project demonstrates Python, financial data processing, portfolio risk analysis, and a robust data pipeline with local CSV fallback support.
 
-Portfolio construction is not only about expected return. A professional investment workflow should also consider volatility, downside risk, tail loss, maximum drawdown, and asset correlation.
+## Project Overview
 
-This project implements a lightweight risk dashboard to analyze these dimensions using historical market data.
+The dashboard calculates and displays key risk indicators for a simple equity portfolio.
 
-## Features
+Current features include:
 
-- Historical price data download
+- Historical price data loading
+- Automatic fallback to local sample data if online data download fails
 - Daily return calculation
-- Portfolio return aggregation
-- Annualized return
-- Annualized volatility
+- Portfolio cumulative return calculation
+- Annualised return
+- Annualised volatility
 - Sharpe ratio
-- Historical Value at Risk
-- Conditional Value at Risk
 - Maximum drawdown
-- Equity curve visualization
-- Drawdown visualization
-- Correlation matrix visualization
+- Portfolio performance chart generation
 
-## Methodology
+The project is intentionally kept simple and modular so that it can be extended later with more advanced quantitative finance methods.
 
-The portfolio return is calculated as a weighted sum of individual asset returns:
+## Why This Project
 
-`portfolio_return = sum(weight_i * asset_return_i)`
+Financial data pipelines often fail when relying only on live API access. This project therefore uses a more robust structure:
 
-where `weight_i` is the portfolio weight of asset `i`, and `asset_return_i` is the daily return of asset `i`.
+1. First, the program attempts to download market data using `yfinance`.
+2. If the download fails, the program automatically falls back to a local CSV file.
+3. This ensures that `python3 main.py` can still run successfully even when the online data source is unavailable.
 
-Historical VaR is estimated from the empirical distribution of portfolio returns. CVaR is calculated as the average portfolio return below the VaR threshold.
+This makes the project more reliable for GitHub review, portfolio demonstration, and local testing.
 
-## Example Portfolio
+## Project Structure
 
-```python
-tickers = ["AAPL", "MSFT"]
-weights = [0.5, 0.5]
+```text
+portfolio-risk-dashboard/
+│
+├── main.py
+├── requirements.txt
+├── README.md
+│
+├── src/
+│   ├── __init__.py
+│   └── data_loader.py
+│
+├── data/
+│   └── sample_prices.csv
+│
+└── outputs/
+    └── portfolio_performance.png
 ```
 
-## Example Outputs
+## Technologies Used
 
-### Equity Curve
+- Python 3
+- pandas
+- numpy
+- matplotlib
+- yfinance
 
-![Equity Curve](outputs/equity_curve.png)
+## Installation
 
-### Drawdown
+Clone the repository:
 
-![Drawdown](outputs/drawdown.png)
+```bash
+git clone https://github.com/your-username/portfolio-risk-dashboard.git
+cd portfolio-risk-dashboard
+```
 
-### Correlation Matrix
+Install dependencies:
 
-![Correlation Matrix](outputs/correlation_matrix.png)
+```bash
+pip3 install -r requirements.txt
+```
+
+If you are using a virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+## How to Run
+
+Run the main script:
+
+```bash
+python3 main.py
+```
+
+If the program runs successfully, it will print a portfolio risk summary in the terminal and generate a performance chart.
+
+Example output:
+
+```text
+Portfolio Risk Summary
+----------------------
+Annualised Return: ...
+Annualised Volatility: ...
+Sharpe Ratio: ...
+Maximum Drawdown: ...
+```
+
+The output chart will be saved to:
+
+```text
+outputs/portfolio_performance.png
+```
 
 ## Data Pipeline
 
-This project uses a multi-source data ingestion pipeline:
+The data loading logic is handled in:
 
-1. `yfinance` is used as the primary online data source.
-2. Stooq CSV data is used as a secondary online data source.
-3. If both online sources fail, the program falls back to `data/sample_prices.csv`.
+```text
+src/data_loader.py
+```
 
-This design improves reproducibility and prevents the project from failing completely when a free external data provider is rate-limited or unavailable.
+The system follows this logic:
+
+```text
+Try to download historical prices from yfinance
+        ↓
+If successful, use downloaded market data
+        ↓
+If unsuccessful, load data/sample_prices.csv
+        ↓
+Calculate returns and portfolio risk metrics
+```
+
+This fallback design makes the project more stable than a script that depends only on live API access.
+
+## Risk Metrics
+
+### Annualised Return
+
+Annualised return estimates the portfolio's yearly return based on average daily returns.
+
+### Annualised Volatility
+
+Annualised volatility measures the standard deviation of portfolio returns on a yearly basis.
+
+### Sharpe Ratio
+
+The Sharpe ratio measures return per unit of risk.
+
+In this project, the basic Sharpe ratio is calculated without a risk-free rate assumption.
+
+### Maximum Drawdown
+
+Maximum drawdown measures the largest peak-to-trough decline in portfolio value.
+
+It is useful for understanding downside risk.
+
+## Example Portfolio
+
+The default example portfolio uses:
+
+```text
+AAPL
+MSFT
+```
+
+The weights are set inside `main.py`.
+
+These tickers can be modified to test different portfolios.
+
+## Local Sample Data
+
+The project includes a local fallback dataset:
+
+```text
+data/sample_prices.csv
+```
+
+This file allows the project to run even if `yfinance` cannot download data due to network issues, API rate limits, or temporary service problems.
+
+## Future Improvements
+
+Possible extensions include:
+
+- Add more assets and dynamic portfolio weights
+- Add Value at Risk
+- Add Conditional Value at Risk
+- Add rolling volatility
+- Add correlation matrix
+- Add benchmark comparison
+- Add Streamlit dashboard interface
+- Add portfolio optimisation
+- Add unit tests
+- Add GitHub Actions workflow for automated testing
+
+## Limitations
+
+This project is for educational and portfolio demonstration purposes only.
+
+It is not financial advice and should not be used as a production trading or investment system.
+
+The risk metrics are simplified and do not account for transaction costs, taxes, liquidity constraints, market impact, or changing risk-free rates.
+
+## Author
+
+Jiacheng Bie
+
+## License
+
+This project is open for educational use.

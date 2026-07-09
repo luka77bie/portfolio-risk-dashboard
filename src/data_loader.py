@@ -52,10 +52,8 @@ def load_price_data(
         if isinstance(raw_data.columns, pd.MultiIndex):
             if "Close" in raw_data.columns.get_level_values(0):
                 prices = raw_data["Close"]
-            elif "Adj Close" in raw_data.columns.get_level_values(0):
-                prices = raw_data["Adj Close"]
             else:
-                raise ValueError("No Close or Adj Close column found in downloaded data.")
+                prices = raw_data["Adj Close"]
         else:
             prices = raw_data
 
