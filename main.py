@@ -1,3 +1,5 @@
+from datetime import date
+
 from src.data_loader import get_price_data, calculate_returns
 from src.portfolio import calculate_portfolio_returns
 from src.risk_metrics import (
@@ -18,7 +20,7 @@ def main():
     tickers = ["AAPL", "MSFT"]
     weights = [0.5, 0.5]
     start_date = "2024-01-01"
-    end_date = "2024-04-01"
+    end_date = date.today().strftime("%Y-%m-%d")
 
     prices = get_price_data(tickers, start_date, end_date)
     asset_returns = calculate_returns(prices)
