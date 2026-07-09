@@ -1,16 +1,22 @@
 import time
 from pathlib import Path
+from datetime import datetime
+
 import pandas as pd
 import yfinance as yf
+import requests
+
 
 def load_local_price_data(file_path="data/sample_prices.csv"):
     """
     Load local sample price data from CSV.
+
     The CSV file must contain:
     - Date column
     - One column per asset ticker
     """
     path = Path(file_path)
+
     if not path.exists():
         raise FileNotFoundError(f"Local price data file not found: {file_path}")
 
@@ -24,11 +30,12 @@ def load_local_price_data(file_path="data/sample_prices.csv"):
 
     return prices
 
-def download_price_data(tickers, start_date, end_date, max_retries=3, sleep_seconds=5):
+
+def download_price_data_yfinance(tickers, start_date, end_date, max_retries=3, sleep_seconds=5):
     """
-    Download adjusted close prices for a list of assets.
-    This function uses yfinance as the primary data source.
-    Free market data APIs may occasionally rate-limit requests.
+    Download adjusted close prices using yfinance.
+
+    yfinance is the primary data source, but it may occasionally be rate-limited.
     """
     last_error = None
 
@@ -57,17 +64,74 @@ def download_price_data(tickers, start_date, end_date, max_retries=3, sleep_seco
             if prices.empty:
                 raise ValueError("Price data is empty after cleaning.")
 
+            print("Data source: yfinance")
             return prices
 
         except Exception as error:
             last_error = error
-            print(f"Download attempt {attempt}/{max_retries} failed: {error}")
+            print(f"yfinance attempt {attempt}/{max_retries} failed: {error}")
             time.sleep(sleep_seconds)
 
-    raise RuntimeError(
-        "Failed to download market data after multiple attempts. "
-        "This may be caused by API rate limits or network issues."
-    ) from last_error
+    raise RuntimeError("yfinance failed after multiple attempts.") from last_error
+
+
+def download_single_ticker_stooq(ticker, start_date, end_date):
+    """
+    Download daily price data for one ticker from Stooq.
+
+    Stooq uses ticker format such as:
+    - AAPL.US
+    - MSFT.US
+
+    This function returns the Close price series.
+    """
+    stooq_ticker = f"{ticker.lower()}.us"
+
+    start = pd.to_datetime(start_date).strftime("%Y%m%d")
+    end = pd.to_datetime(end_date).strftime("%Y%m%d")
+
+    url = (
+        "https://stooq.com/q/d/l/"
+        f"?s={stooq_ticker}&d1={start}&d2={end}&i=d"
+    )
+
+    response = requests.get(url, timeout=10)
+
+    if response.status_code != 200:
+        raise RuntimeError(f"Stooq request failed for {ticker}: HTTP {response.status_code}")
+
+    from io import StringIO
+
+    data = pd.read_csv(StringIO(response.text))
+
+    if data.empty or "Close" not in data.columns:
+        raise ValueError(f"Stooq returned empty or invalid data for {ticker}")
+
+    data["Date"] = pd.to_datetime(data["Date"])
+    data = data.set_index("Date").sort_index()
+
+    return data["Close"].rename(ticker)
+
+
+def download_price_data_stooq(tickers, start_date, end_date):
+    """
+    Download price data from Stooq as a secondary online data source.
+    """
+    series_list = []
+
+    for ticker in tickers:
+        series = download_single_ticker_stooq(ticker, start_date, end_date)
+        series_list.append(series)
+
+    prices = pd.concat(series_list, axis=1)
+    prices = prices.dropna(how="all")
+
+    if prices.empty:
+        raise ValueError("Stooq price data is empty.")
+
+    print("Data source: Stooq")
+    return prices
+
 
 def get_price_data(
     tickers,
@@ -77,26 +141,42 @@ def get_price_data(
     local_file_path="data/sample_prices.csv",
 ):
     """
-    Get price data from yfinance first, then fall back to local CSV if needed.
+    Get price data using a multi-source fallback pipeline.
+
+    Priority:
+    1. yfinance
+    2. Stooq
+    3. Local CSV fallback
     """
     try:
-        return download_price_data(tickers, start_date, end_date)
-    except Exception as error:
-        if not use_local_fallback:
-            raise error
+        return download_price_data_yfinance(tickers, start_date, end_date)
 
-        print("\nMarket data download failed.")
-        print("Falling back to local sample data.")
-        print(f"Reason: {error}\n")
+    except Exception as yfinance_error:
+        print("\nyfinance download failed.")
+        print(f"Reason: {yfinance_error}\n")
 
-        prices = load_local_price_data(local_file_path)
-        missing_tickers = [ticker for ticker in tickers if ticker not in prices.columns]
-        if missing_tickers:
-            raise ValueError(
-                f"Local sample data does not contain requested tickers: {missing_tickers}"
-            )
+    try:
+        return download_price_data_stooq(tickers, start_date, end_date)
 
-        return prices[tickers]
+    except Exception as stooq_error:
+        print("\nStooq download failed.")
+        print(f"Reason: {stooq_error}\n")
+
+    if not use_local_fallback:
+        raise RuntimeError("All online data sources failed and local fallback is disabled.")
+
+    print("Falling back to local sample data.\n")
+
+    prices = load_local_price_data(local_file_path)
+
+    missing_tickers = [ticker for ticker in tickers if ticker not in prices.columns]
+    if missing_tickers:
+        raise ValueError(
+            f"Local sample data does not contain requested tickers: {missing_tickers}"
+        )
+
+    return prices[tickers]
+
 
 def calculate_returns(prices):
     """
