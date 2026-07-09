@@ -1,7 +1,6 @@
-cat > src/data_loader.py << 'EOF'
 import time
 from pathlib import Path
-from io import StringIO
+from datetime import datetime
 
 import pandas as pd
 import yfinance as yf
@@ -11,6 +10,10 @@ import requests
 def load_local_price_data(file_path="data/sample_prices.csv"):
     """
     Load local sample price data from CSV.
+
+    The CSV file must contain:
+    - Date column
+    - One column per asset ticker
     """
     path = Path(file_path)
 
@@ -25,13 +28,14 @@ def load_local_price_data(file_path="data/sample_prices.csv"):
     if prices.empty:
         raise ValueError("Local price data is empty.")
 
-    print("Data source: local CSV")
     return prices
 
 
 def download_price_data_yfinance(tickers, start_date, end_date, max_retries=3, sleep_seconds=5):
     """
     Download adjusted close prices using yfinance.
+
+    yfinance is the primary data source, but it may occasionally be rate-limited.
     """
     last_error = None
 
@@ -73,8 +77,13 @@ def download_price_data_yfinance(tickers, start_date, end_date, max_retries=3, s
 
 def download_single_ticker_stooq(ticker, start_date, end_date):
     """
-    Download daily close price for one US ticker from Stooq.
-    Example: AAPL -> aapl.us
+    Download daily price data for one ticker from Stooq.
+
+    Stooq uses ticker format such as:
+    - AAPL.US
+    - MSFT.US
+
+    This function returns the Close price series.
     """
     stooq_ticker = f"{ticker.lower()}.us"
 
@@ -86,10 +95,12 @@ def download_single_ticker_stooq(ticker, start_date, end_date):
         f"?s={stooq_ticker}&d1={start}&d2={end}&i=d"
     )
 
-    response = requests.get(url, timeout=15)
+    response = requests.get(url, timeout=10)
 
     if response.status_code != 200:
         raise RuntimeError(f"Stooq request failed for {ticker}: HTTP {response.status_code}")
+
+    from io import StringIO
 
     data = pd.read_csv(StringIO(response.text))
 
@@ -104,7 +115,7 @@ def download_single_ticker_stooq(ticker, start_date, end_date):
 
 def download_price_data_stooq(tickers, start_date, end_date):
     """
-    Download price data from Stooq as secondary online data source.
+    Download price data from Stooq as a secondary online data source.
     """
     series_list = []
 
@@ -130,12 +141,12 @@ def get_price_data(
     local_file_path="data/sample_prices.csv",
 ):
     """
-    Multi-source price data pipeline.
+    Get price data using a multi-source fallback pipeline.
 
     Priority:
     1. yfinance
     2. Stooq
-    3. local CSV fallback
+    3. Local CSV fallback
     """
     try:
         return download_price_data_yfinance(tickers, start_date, end_date)
@@ -179,4 +190,3 @@ def calculate_returns(prices):
         )
 
     return returns
-EOF
