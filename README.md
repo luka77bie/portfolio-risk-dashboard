@@ -25,16 +25,19 @@ This project implements a lightweight risk dashboard to analyze these dimensions
 
 ## Methodology
 
-The portfolio return is calculated as:
+The portfolio return is calculated as a weighted sum of individual asset returns:
 
-```math
-r_p = \sum_i w_i r_i
+`portfolio_return = sum(weight_i * asset_return_i)`
 
-### where ( w_i ) is the portfolio weight of asset ( i ), and ( r_i ) is its daily return.
-Historical VaR is estimated from the empirical distribution of portfolio returns. CVaR is calculated as the average loss beyond the VaR threshold.
-### Example
-tickers = ["AAPL", "MSFT", "NVDA", "JPM"]
-weights = [0.25, 0.25, 0.25, 0.25]
+where `weight_i` is the portfolio weight of asset `i`, and `asset_return_i` is the daily return of asset `i`.
+
+Historical VaR is estimated from the empirical distribution of portfolio returns. CVaR is calculated as the average portfolio return below the VaR threshold.
+
+## Example Portfolio
+
+```python
+tickers = ["AAPL", "MSFT"]
+weights = [0.5, 0.5]
 
 ## Example Outputs
 
