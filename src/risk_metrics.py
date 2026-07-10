@@ -1,38 +1,72 @@
 import numpy as np
-
-def validate_returns(daily_returns):
-    """
-    Validate that return series is not empty.
-    """
-    if daily_returns is None or len(daily_returns) == 0:
-        raise ValueError("Daily returns are empty. Cannot calculate risk metrics.")
+import pandas as pd
 
 
-def annualized_return(daily_returns, trading_days=252):
+def calculate_daily_returns(prices: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate annualized return from daily returns.
+    Calculate daily percentage returns from price data.
     """
-    validate_returns(daily_returns)
-    cumulative_return = (1 + daily_returns).prod()
-    n_days = len(daily_returns)
-    return cumulative_return ** (trading_days / n_days) - 1
+    returns = prices.pct_change().dropna()
+
+    if returns.empty:
+        raise ValueError("Not enough price data to calculate returns.")
+
+    return returns
 
 
-def annualized_volatility(daily_returns, trading_days=252):
+def calculate_portfolio_returns(
+    asset_returns: pd.DataFrame,
+    weights: np.ndarray,
+) -> pd.Series:
     """
-    Calculate annualized volatility.
+    Calculate portfolio daily returns as weighted asset returns.
     """
-    validate_returns(daily_returns)
-    return daily_returns.std() * np.sqrt(trading_days)
+    weights = np.asarray(weights, dtype=float)
+
+    if len(weights) != asset_returns.shape[1]:
+        raise ValueError("Number of weights must match number of assets.")
+
+    if weights.sum() == 0:
+        raise ValueError("Portfolio weights cannot sum to zero.")
+
+    weights = weights / weights.sum()
+
+    return asset_returns.dot(weights)
 
 
-def sharpe_ratio(daily_returns, risk_free_rate=0.02, trading_days=252):
+def calculate_cumulative_returns(portfolio_returns: pd.Series) -> pd.Series:
     """
-    Calculate annualized Sharpe ratio.
+    Calculate cumulative portfolio returns.
     """
-    validate_returns(daily_returns)
-    ann_return = annualized_return(daily_returns, trading_days)
-    ann_vol = annualized_volatility(daily_returns, trading_days)
+    return (1 + portfolio_returns).cumprod()
+
+
+def annualised_return(portfolio_returns: pd.Series, trading_days: int = 252) -> float:
+    """
+    Estimate annualised return using average daily return.
+    """
+    return portfolio_returns.mean() * trading_days
+
+
+def annualised_volatility(portfolio_returns: pd.Series, trading_days: int = 252) -> float:
+    """
+    Estimate annualised volatility using daily return standard deviation.
+    """
+    return portfolio_returns.std() * np.sqrt(trading_days)
+
+
+def sharpe_ratio(
+    portfolio_returns: pd.Series,
+    risk_free_rate: float = 0.0,
+    trading_days: int = 252,
+) -> float:
+    """
+    Calculate simplified annualised Sharpe ratio.
+
+    risk_free_rate is expressed as an annual rate.
+    """
+    ann_return = annualised_return(portfolio_returns, trading_days)
+    ann_vol = annualised_volatility(portfolio_returns, trading_days)
 
     if ann_vol == 0:
         return np.nan
@@ -40,30 +74,74 @@ def sharpe_ratio(daily_returns, risk_free_rate=0.02, trading_days=252):
     return (ann_return - risk_free_rate) / ann_vol
 
 
-def max_drawdown(daily_returns):
+def drawdown_series(portfolio_returns: pd.Series) -> pd.Series:
+    """
+    Calculate drawdown series from portfolio returns.
+    """
+    cumulative_returns = calculate_cumulative_returns(portfolio_returns)
+    running_max = cumulative_returns.cummax()
+    drawdown = cumulative_returns / running_max - 1
+
+    return drawdown
+
+
+def maximum_drawdown(portfolio_returns: pd.Series) -> float:
     """
     Calculate maximum drawdown.
     """
-    validate_returns(daily_returns)
-    cumulative = (1 + daily_returns).cumprod()
-    running_max = cumulative.cummax()
-    drawdown = cumulative / running_max - 1
-    return drawdown.min()
+    return drawdown_series(portfolio_returns).min()
 
 
-def historical_var(daily_returns, confidence_level=0.95):
+def historical_var(portfolio_returns: pd.Series, confidence_level: float = 0.95) -> float:
     """
-    Calculate historical Value at Risk.
+    Calculate Historical Value at Risk as a return quantile.
+
+    Negative values represent portfolio losses.
     """
-    validate_returns(daily_returns)
-    return np.percentile(daily_returns, (1 - confidence_level) * 100)
+    return np.percentile(portfolio_returns, (1 - confidence_level) * 100)
 
 
-def historical_cvar(daily_returns, confidence_level=0.95):
+def historical_cvar(portfolio_returns: pd.Series, confidence_level: float = 0.95) -> float:
     """
-    Calculate historical Conditional Value at Risk.
-    """
-    validate_returns(daily_returns)
-    var = historical_var(daily_returns, confidence_level)
-    return daily_returns[daily_returns <= var].mean()
+    Calculate Historical Conditional Value at Risk.
 
+    CVaR is the average return below the VaR threshold.
+    Negative values represent average tail losses.
+    """
+    var = historical_var(portfolio_returns, confidence_level)
+    tail_losses = portfolio_returns[portfolio_returns <= var]
+
+    if tail_losses.empty:
+        return np.nan
+
+    return tail_losses.mean()
+
+
+def calculate_summary_metrics(
+    prices: pd.DataFrame,
+    weights: np.ndarray,
+    risk_free_rate: float = 0.0,
+    confidence_level: float = 0.95,
+) -> dict:
+    """
+    Calculate portfolio return, risk, tail-risk, and drawdown metrics.
+    """
+    asset_returns = calculate_daily_returns(prices)
+    portfolio_returns = calculate_portfolio_returns(asset_returns, weights)
+    cumulative_returns = calculate_cumulative_returns(portfolio_returns)
+    drawdowns = drawdown_series(portfolio_returns)
+
+    metrics = {
+        "asset_returns": asset_returns,
+        "portfolio_returns": portfolio_returns,
+        "cumulative_returns": cumulative_returns,
+        "drawdowns": drawdowns,
+        "annualised_return": annualised_return(portfolio_returns),
+        "annualised_volatility": annualised_volatility(portfolio_returns),
+        "sharpe_ratio": sharpe_ratio(portfolio_returns, risk_free_rate),
+        "maximum_drawdown": maximum_drawdown(portfolio_returns),
+        "historical_var": historical_var(portfolio_returns, confidence_level),
+        "historical_cvar": historical_cvar(portfolio_returns, confidence_level),
+    }
+
+    return metrics
